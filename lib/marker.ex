@@ -38,6 +38,18 @@ defmodule Marker do
     end
   end
 
+  @doc "Define a new fragment"
+  defmacro fragment(name, do: block) do
+    block = Marker.handle_assigns(block, false)
+    quote do
+      def unquote(name)(var!(assigns)) do
+        use Marker.HTML
+        _ = var!(assigns)
+        fragment do: unquote(block)
+      end
+    end
+  end
+
   defmacro __using__(_) do
     quote do
       import Marker, only: [component: 2, template: 2]

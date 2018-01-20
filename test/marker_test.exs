@@ -94,4 +94,40 @@ defmodule MarkerTest do
     assert E.apply_casing(:tag_casing_test, :lisp)         == :"tag-casing-test"
     assert E.apply_casing(:tag_casing_test, :lisp_upcase)  == :"TAG-CASING-TEST"
   end
+
+  Marker.template :has_fragment do
+    fragment do
+      div "el #{@v1}"
+      div "el #{@v2}"
+    end
+  end
+
+  Marker.fragment :as_template do
+    div "el #{@v1}"
+    div "el #{@v2}"
+  end
+
+  test "fragments" do
+    assert has_fragment(v1: 1, v2: 2) == {:safe, "<div>el 1</div><div>el 2</div>"}
+    assert has_fragment(v1: 3, v2: 4) == {:safe, "<div>el 3</div><div>el 4</div>"}
+    assert as_template(v1: 1, v2: 2) == {:safe, "<div>el 1</div><div>el 2</div>"}
+    assert as_template(v1: 3, v2: 4) == {:safe, "<div>el 3</div><div>el 4</div>"}
+  end
+
+  defp rand_num, do: Enum.random([1,2,3,4])
+  Marker.template :test_rand do
+    fragment do
+      div "1st: #{rand_num()}"
+      div "2nd: #{rand_num()}"
+    end
+  end
+
+  test "random" do
+    :rand.seed(:exsplus, {10001, 102, 1000})
+    assert test_rand([]) == {:safe, "<div>1st: 1</div><div>2nd: 4</div>"}
+    assert test_rand([]) == {:safe, "<div>1st: 1</div><div>2nd: 3</div>"}
+    :rand.seed(:exsplus, {10001, 102, 1})
+    assert test_rand([]) == {:safe, "<div>1st: 2</div><div>2nd: 4</div>"}
+    assert test_rand([]) == {:safe, "<div>1st: 1</div><div>2nd: 3</div>"}
+  end
 end

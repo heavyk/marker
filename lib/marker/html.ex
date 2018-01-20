@@ -11,7 +11,7 @@ defmodule Marker.HTML do
     canvas caption cite code col colgroup content
     data datalist dd del details dfn div dl dt
     em embed
-    fieldset figcaption figure footer form
+    fieldset figcaption figure footer form fragment
     h1 h2 h3 h4 h5 h6 head header hr html
     i iframe img input ins
     kbd keygen
