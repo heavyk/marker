@@ -52,7 +52,7 @@ defmodule Marker do
 
   defmacro __using__(_) do
     quote do
-      import Marker, only: [component: 2, template: 2]
+      import Marker, only: [component: 2, template: 2, fragment: 2]
     end
   end
 

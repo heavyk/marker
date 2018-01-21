@@ -81,6 +81,11 @@ defmodule Marker.Element do
           Marker.Element.def_element(tag, unquote(casing))
         end
       end)
+      defmacro fragment(content) do
+        { attrs, content } = Marker.Element.normalize_args(content, nil, __CALLER__)
+        %Marker.Element{tag: :fragment, attrs: attrs, content: content}
+        |> Marker.Compiler.compile()
+      end
     end
   end
 
