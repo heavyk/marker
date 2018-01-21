@@ -63,6 +63,11 @@ defmodule Marker.Element do
   defmacro __using__(opts) do
     tags = opts[:tags] || []
     casing = opts[:casing] || :snake
+    tags = Macro.expand(tags, __CALLER__)
+    functions = Enum.reduce(__CALLER__.functions, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
+    macros = Enum.reduce(__CALLER__.macros, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
+    remove = Keyword.keys(find_ambiguous_imports(tags))
+    keys = (functions ++ macros) -- remove
     quote do
       defmacro __using__(_) do
         ambiguous_imports = Marker.Element.find_ambiguous_imports(unquote(tags))
@@ -72,7 +77,9 @@ defmodule Marker.Element do
         end
       end
       Enum.each(unquote(tags), fn tag ->
-        Marker.Element.def_element(tag, unquote(casing))
+        if not tag in unquote(keys) do
+          Marker.Element.def_element(tag, unquote(casing))
+        end
       end)
     end
   end
@@ -130,16 +137,16 @@ defmodule Marker.Element do
   @doc false
   def normalize_args(content_or_attrs, maybe_content, env) do
     case {expand(content_or_attrs, env), expand(maybe_content, env)} do
-      { [{:do, {:"__block__", _, content}}], nil } -> {[], content}
-      { [{:do, content}], nil } -> {[], content}
-      { [{_,_}|_] = attrs, nil } -> {attrs, nil}
+      { [{:do, {:"__block__", _, content}}], nil } ->               {[], content}
+      { [{:do, content}], nil } ->                                  {[], content}
+      { [{_,_}|_] = attrs, nil } ->                                 {attrs, nil}
       { [{_,_}|_] = attrs, [{:do, {:"__block__", _, content}}] } -> {attrs, content}
-      { [{_,_}|_] = attrs, [{:do, content}] } -> {attrs, content}
-      { [{_,_}|_] = attrs, content } -> {attrs, content}
-      { content, nil } -> {[], content}
-      { content, [{_,_}|_] = attrs } -> {attrs, content}
-      _ ->
-        raise ArgumentError, message: "element macro received unexpected arguments"
+      { [{_,_}|_] = attrs, [{:do, content}] } ->                    {attrs, content}
+      { [{_,_}|_] = attrs, content } ->                             {attrs, content}
+      { content, nil } ->                                           {[], content}
+      { content, [{_,_}|_] = attrs } ->                             {attrs, content}
+			_ ->
+        raise ArgumentError, message: "element macro received unexpected arguments: (#{inspect content_or_attrs}, #{inspect maybe_content})"
     end
   end
 
