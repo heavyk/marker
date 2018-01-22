@@ -59,7 +59,7 @@ iex> div class: "test" do
 
 ## Templates and Components
 
-  `Marker` provides templates and components as a convenient abstraction. A template is just a function with one argument. It expects a data structure that can be accessed with the `Access` protocol, like `Map` or `Keyword`. The fields of the argument can be accessed with the `@` attribute syntax. This works because templates and components provide an implementation of the `assigns` extension of `EEx` templates for easy data access. Components are like templates, but in adition to the template function, they define a macro that can be called just like the element macros. The contents of the `do` block of a component are accessable as `@__content__` in the component definition and is always wrapped in a list. A small, but important difference between templates and components is that an unavailable assign in a template raises a `RuntimeError`, as assigns are considered mandatory for templates, but they are optional for components. This makes it for example possible to define a component that optionally accepts a custom class.
+  `Marker` provides templates and components as a convenient abstraction. A template is just a function with one argument. It expects a data structure that can be accessed with the `Access` protocol, like `Map` or `Keyword`. The fields of the argument can be accessed with the `@` attribute syntax. This works because templates and components provide an implementation of the `assigns` extension of `EEx` templates for easy data access. Components are like templates, but in addition to the template function, they define a macro that can be called just like the element macros. The contents of the `do` block of a component are accessible as `@__content__` in the component definition and is always wrapped in a list. A small, but important difference between templates and components is that an unavailable assign in a template raises a `RuntimeError`, as assigns are considered mandatory for templates, but they are optional for components. This makes it for example possible to define a component that optionally accepts a custom class.
 
   An example makes this all probably much easier to understand, so here are a few components that could make using Bootstrap simpler:
 
@@ -89,8 +89,8 @@ defmodule MyComponents do
 
   template :test do
     html body do
-    h1 @title
-    form do
+      h1 @title
+      form do
         form_input id: "form-address", label: "Address", placeholder: "Fill in address"
         form_select id: "form-country", label: "Country", class: "country-select" do
           option "Netherlands", value: "NL"

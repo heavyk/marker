@@ -50,7 +50,7 @@ defmodule Marker.Element do
     * `:lisp` => `my-element`
     * `:lisp_upcase` => `MY-ELEMENT`
   """
-  defstruct tag: :div, attrs: %{}, content: nil
+  defstruct tag: :div, attrs: [], content: nil
 
   @type attr_name     :: atom
   @type attr_value    :: Marker.Encoder.t
