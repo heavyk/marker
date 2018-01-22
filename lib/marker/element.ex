@@ -82,9 +82,10 @@ defmodule Marker.Element do
         end
       end)
       defmacro fragment(content) do
+        compiler = Module.get_attribute(__CALLER__.module, :marker_compiler) || Marker.Compiler
         { attrs, content } = Marker.Element.normalize_args(content, nil, __CALLER__)
         %Marker.Element{tag: :fragment, attrs: attrs, content: content}
-        |> Marker.Compiler.compile()
+        |> compiler.compile()
       end
     end
   end
@@ -94,9 +95,10 @@ defmodule Marker.Element do
     quote bind_quoted: [tag: tag, casing: casing] do
       defmacro unquote(tag)(content_or_attrs \\ nil, maybe_content \\ nil) do
         tag = unquote(tag) |> Marker.Element.apply_casing(unquote(casing))
+        compiler = Module.get_attribute(__CALLER__.module, :marker_compiler) || Marker.Compiler
         { attrs, content } = Marker.Element.normalize_args(content_or_attrs, maybe_content, __CALLER__)
         %Marker.Element{tag: tag, attrs: attrs, content: content}
-        |> Marker.Compiler.compile()
+        |> compiler.compile()
       end
     end
   end
