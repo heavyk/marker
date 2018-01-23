@@ -84,7 +84,7 @@ defmodule Marker.Element do
       defmacro fragment(content) do
         compiler = Module.get_attribute(__CALLER__.module, :marker_compiler) || Marker.Compiler
         { attrs, content } = Marker.Element.normalize_args(content, nil, __CALLER__)
-        %Marker.Element{tag: :fragment, attrs: attrs, content: content}
+        %Marker.Element{tag: :_fragment, attrs: attrs, content: content}
         |> compiler.compile()
       end
     end

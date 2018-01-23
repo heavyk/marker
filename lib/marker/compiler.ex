@@ -43,7 +43,7 @@ defmodule Marker.Compiler do
   end
 
   @spec compile(element, chunks) :: chunks
-  defp compile(%Element{tag: :fragment, attrs: _attrs, content: content}, chunks) do
+  defp compile(%Element{tag: :_fragment, attrs: _attrs, content: content}, chunks) do
     Enum.reduce(content, chunks, &compile/2)
   end
   defp compile(%Element{tag: tag, attrs: attrs, content: content}, chunks) do
