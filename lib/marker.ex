@@ -25,7 +25,8 @@ defmodule Marker do
       def unquote(template)(var!(assigns)) do
         unquote(use_elements)
         _ = var!(assigns)
-        unquote(block)
+        content = unquote(block)
+        component_ do: content
       end
     end
   end
@@ -38,7 +39,8 @@ defmodule Marker do
       def unquote(name)(var!(assigns)) do
         unquote(use_elements)
         _ = var!(assigns)
-        unquote(block)
+        content = unquote(block)
+        template_ do: content
       end
     end
   end

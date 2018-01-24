@@ -63,6 +63,7 @@ defmodule Marker.Element do
   defmacro __using__(opts) do
     tags = opts[:tags] || []
     casing = opts[:casing] || :snake
+    containers = [:template, :component] ++ List.wrap(opts[:containers])
     tags = Macro.expand(tags, __CALLER__)
     functions = Enum.reduce(__CALLER__.functions, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
     macros = Enum.reduce(__CALLER__.macros, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
@@ -81,12 +82,12 @@ defmodule Marker.Element do
           Marker.Element.def_element(tag, unquote(casing))
         end
       end)
-      defmacro fragment(content) do
-        compiler = Module.get_attribute(__CALLER__.module, :marker_compiler) || Marker.Compiler
-        { attrs, content } = Marker.Element.normalize_args(content, nil, __CALLER__)
-        %Marker.Element{tag: :_fragment, attrs: attrs, content: content}
-        |> compiler.compile()
-      end
+      Marker.Element.def_container(:_fragment, :fragment)
+      Enum.each(unquote(containers), fn name ->
+        fun = String.to_atom(Atom.to_string(name) <> "_")
+        tag = String.to_atom("_" <> Atom.to_string(name))
+        Marker.Element.def_container(tag, fun)
+      end)
     end
   end
 
@@ -98,6 +99,18 @@ defmodule Marker.Element do
         compiler = Module.get_attribute(__CALLER__.module, :marker_compiler) || Marker.Compiler
         { attrs, content } = Marker.Element.normalize_args(content_or_attrs, maybe_content, __CALLER__)
         %Marker.Element{tag: tag, attrs: attrs, content: content}
+        |> compiler.compile()
+      end
+    end
+  end
+
+  @doc false
+  defmacro def_container(tag, fun) do
+    quote bind_quoted: [tag: tag, fun: fun] do
+      defmacro unquote(fun)(content) do
+        compiler = Module.get_attribute(__CALLER__.module, :marker_compiler) || Marker.Compiler
+        { _, content } = Marker.Element.normalize_args(content, nil, __CALLER__)
+        %Marker.Element{tag: unquote(tag), content: content}
         |> compiler.compile()
       end
     end

@@ -116,18 +116,19 @@ defmodule MarkerTest do
 
   defp rand_num, do: Enum.random([1,2,3,4])
   Marker.template :test_rand do
+    rand_var = Enum.random([1,2,3,4])
     fragment do
-      div "1st: #{rand_num()}"
-      div "2nd: #{rand_num()}"
+      div "1st: #{rand_num()} #{rand_var}"
+      div "2nd: #{rand_num()} #{rand_var}"
     end
   end
 
   test "random" do
     :rand.seed(:exsplus, {10001, 102, 1000})
-    assert test_rand([]) == {:safe, "<div>1st: 1</div><div>2nd: 4</div>"}
-    assert test_rand([]) == {:safe, "<div>1st: 1</div><div>2nd: 3</div>"}
+    assert test_rand([]) == {:safe, "<div>1st: 4 1</div><div>2nd: 1 1</div>"}
+    assert test_rand([]) == {:safe, "<div>1st: 1 3</div><div>2nd: 2 3</div>"}
     :rand.seed(:exsplus, {10001, 102, 1})
-    assert test_rand([]) == {:safe, "<div>1st: 2</div><div>2nd: 4</div>"}
-    assert test_rand([]) == {:safe, "<div>1st: 1</div><div>2nd: 3</div>"}
+    assert test_rand([]) == {:safe, "<div>1st: 4 2</div><div>2nd: 1 2</div>"}
+    assert test_rand([]) == {:safe, "<div>1st: 1 3</div><div>2nd: 3 3</div>"}
   end
 end
