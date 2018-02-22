@@ -36,7 +36,7 @@ defmodule Marker do
     use_elements = Module.get_attribute(__CALLER__.module, :marker_use_elements, @default_elements)
     block = Marker.handle_assigns(block, false)
     quote do
-      def unquote(name)(var!(assigns)) do
+      def unquote(name)(var!(assigns) \\ []) do
         unquote(use_elements)
         _ = var!(assigns)
         content = unquote(block)
@@ -61,11 +61,9 @@ defmodule Marker do
   defmacro __using__(opts) do
     compiler = opts[:compiler] || @default_compiler
     compiler = Macro.expand(compiler, __CALLER__)
-    use_elements = if mods = Keyword.get(opts, :elements, @default_elements) do
-                 for mod <- List.wrap(mods) do
-                   quote do: use unquote(mod)
-                 end
-               end
+    mods = Keyword.get(opts, :elements, @default_elements)
+    use_elements =
+      for mod <- List.wrap(mods), do: (quote do: use unquote(mod))
     if mod = __CALLER__.module do
       Module.put_attribute(mod, :marker_compiler, compiler)
       Module.put_attribute(mod, :marker_use_elements, use_elements)
@@ -83,7 +81,7 @@ defmodule Marker do
         line = Keyword.get(meta, :line, 0)
         if allow_optional do
           quote line: line do
-            Map.get(var!(assigns), unquote(name))
+            Access.get(var!(assigns), unquote(name))
           end
         else
           quote line: line do
