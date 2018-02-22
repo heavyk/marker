@@ -155,7 +155,7 @@ defmodule Marker.Element do
   end
 
   # binary selectors were a nice try, but they'll fail for (div "...") or (div "#1"), which isn't really acceptable.
-  # so, instead selectors must be defined as a charlist, eg. (div '#id.text.lala')
+  # so, instead selectors must be defined as a charlist, eg. (div 'input#id.text.lala')
   defguard is_selector(v) when length(v) > 1 and is_integer(hd(v))
 
   @doc false
@@ -165,10 +165,10 @@ defmodule Marker.Element do
       { [{:do, content}], nil } ->                                  {[], content}
 
       # selectors :: eg. (div '.c1.c2#id')
-      { attrs, nil } when is_selector(attrs) ->                                 {parse_selector(attrs), nil}
-      { attrs, [{:do, {:"__block__", _, content}}] } when is_selector(attrs) -> {parse_selector(attrs), content}
-      { attrs, [{:do, content}] } when is_selector(attrs) ->                    {parse_selector(attrs), content}
-      { attrs, content } when is_selector(attrs) ->                             {parse_selector(attrs), content}
+      { attrs, nil } when is_selector(attrs) ->                                 {selector_attrs(attrs), nil}
+      { attrs, [{:do, {:"__block__", _, content}}] } when is_selector(attrs) -> {selector_attrs(attrs), content}
+      { attrs, [{:do, content}] } when is_selector(attrs) ->                    {selector_attrs(attrs), content}
+      { attrs, content } when is_selector(attrs) ->                             {selector_attrs(attrs), content}
 
       { [{_,_}|_] = attrs, nil } ->                                 {attrs, nil}
       { [{_,_}|_] = attrs, [{:do, {:"__block__", _, content}}] } -> {attrs, content}
@@ -183,9 +183,14 @@ defmodule Marker.Element do
 
   def parse_selector(s) do
     binary = to_string(s)
-    Regex.split(~r/[\.#][a-zA-Z0-9_:-]+/, binary, include_captures: true)
+    matches = Regex.split(~r/[\.#]?[a-zA-Z0-9_:-]+/, binary, include_captures: true)
     |> Enum.reject(fn s -> byte_size(s) == 0 end)
-    |> Enum.reduce([], fn i, acc ->
+    tag = case List.first(matches) do
+      "." <> _ -> :div
+      "#" <> _ -> :div
+      tag -> String.to_atom(tag)
+    end
+    attrs = Enum.reduce(matches, [], fn i, acc ->
       case i do
         "." <> c -> [{:class, String.to_atom(c)} | acc]
         "#" <> c -> [{:id, String.to_atom(c)} | acc]
@@ -193,6 +198,12 @@ defmodule Marker.Element do
       end
     end)
     |> :lists.reverse()
+    {tag, attrs}
+  end
+
+  defp selector_attrs(s) do
+    {_, attrs} = parse_selector(s)
+    attrs
   end
 
   defp expand(arg, env) do
