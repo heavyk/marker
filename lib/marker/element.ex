@@ -154,11 +154,22 @@ defmodule Marker.Element do
     end
   end
 
+  # binary selectors were a nice try, but they'll fail for (div "...") or (div "#1"), which isn't really acceptable.
+  # so, instead selectors must be defined as a charlist, eg. (div '#id.text.lala')
+  defguard is_selector(v) when length(v) > 1 and is_integer(hd(v))
+
   @doc false
   def normalize_args(content_or_attrs, maybe_content, env) do
     case {expand(content_or_attrs, env), expand(maybe_content, env)} do
       { [{:do, {:"__block__", _, content}}], nil } ->               {[], content}
       { [{:do, content}], nil } ->                                  {[], content}
+
+      # selectors :: eg. (div '.c1.c2#id')
+      { attrs, nil } when is_selector(attrs) ->                                 {parse_selector(attrs), nil}
+      { attrs, [{:do, {:"__block__", _, content}}] } when is_selector(attrs) -> {parse_selector(attrs), content}
+      { attrs, [{:do, content}] } when is_selector(attrs) ->                    {parse_selector(attrs), content}
+      { attrs, content } when is_selector(attrs) ->                             {parse_selector(attrs), content}
+
       { [{_,_}|_] = attrs, nil } ->                                 {attrs, nil}
       { [{_,_}|_] = attrs, [{:do, {:"__block__", _, content}}] } -> {attrs, content}
       { [{_,_}|_] = attrs, [{:do, content}] } ->                    {attrs, content}
@@ -168,6 +179,20 @@ defmodule Marker.Element do
 			_ ->
         raise ArgumentError, message: "element macro received unexpected arguments: (#{inspect content_or_attrs}, #{inspect maybe_content})"
     end
+  end
+
+  def parse_selector(s) do
+    binary = to_string(s)
+    Regex.split(~r/[\.#][a-zA-Z0-9_:-]+/, binary, include_captures: true)
+    |> Enum.reject(fn s -> byte_size(s) == 0 end)
+    |> Enum.reduce([], fn i, acc ->
+      case i do
+        "." <> c -> [{:class, String.to_atom(c)} | acc]
+        "#" <> c -> [{:id, String.to_atom(c)} | acc]
+        _ -> acc
+      end
+    end)
+    |> :lists.reverse()
   end
 
   defp expand(arg, env) do
