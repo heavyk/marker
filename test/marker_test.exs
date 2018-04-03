@@ -102,16 +102,9 @@ defmodule MarkerTest do
     end
   end
 
-  Marker.fragment :as_template do
-    div "el #{@v1}"
-    div "el #{@v2}"
-  end
-
   test "fragments" do
     assert has_fragment(v1: 1, v2: 2) == {:safe, "<div>el 1</div><div>el 2</div>"}
     assert has_fragment(v1: 3, v2: 4) == {:safe, "<div>el 3</div><div>el 4</div>"}
-    assert as_template(v1: 1, v2: 2) == {:safe, "<div>el 1</div><div>el 2</div>"}
-    assert as_template(v1: 3, v2: 4) == {:safe, "<div>el 3</div><div>el 4</div>"}
   end
 
   defp rand_num, do: Enum.random([1,2,3,4])

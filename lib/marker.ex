@@ -48,18 +48,18 @@ defmodule Marker do
   end
 
   @doc "Define a new fragment"
-  defmacro fragment(name, do: block) when is_atom(name) do
-    use_elements = Module.get_attribute(__CALLER__.module, :marker_use_elements, @default_elements)
-    # {block, logic} = Marker.handle_logic(block, [])
-    block = Marker.handle_logic(block)
-    quote do
-      def unquote(name)(var!(assigns)) do
-        unquote(use_elements)
-        _ = var!(assigns)
-        fragment do: unquote(block)
-      end
-    end
-  end
+  # defmacro fragment(name, do: block) when is_atom(name) do
+  #   use_elements = Module.get_attribute(__CALLER__.module, :marker_use_elements, @default_elements)
+  #   # {block, logic} = Marker.handle_logic(block, [])
+  #   block = Marker.handle_logic(block)
+  #   quote do
+  #     def unquote(name)(var!(assigns)) do
+  #       unquote(use_elements)
+  #       _ = var!(assigns)
+  #       fragment do: unquote(block)
+  #     end
+  #   end
+  # end
 
   defmacro __using__(opts) do
     compiler = opts[:compiler] || @default_compiler
@@ -72,7 +72,7 @@ defmodule Marker do
       Module.put_attribute(mod, :marker_use_elements, use_elements)
     end
     quote do
-      import Marker, only: [component: 2, template: 2, fragment: 2]
+      import Marker, only: [component: 2, template: 2]
       unquote(use_elements)
     end
   end
