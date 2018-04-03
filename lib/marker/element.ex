@@ -210,3 +210,11 @@ defmodule Marker.Element do
     Macro.prewalk(arg, &Macro.expand_once(&1, env))
   end
 end
+
+defmodule Marker.Element.If do
+  defstruct tag: :_if, test: true, do: nil, else: nil
+end
+
+defmodule Marker.Element.Var do
+  defstruct tag: :_var, name: nil
+end
