@@ -1,3 +1,7 @@
+defmodule Marker.Container do
+  defstruct content: nil, scope: []
+end
+
 defmodule Marker.Element do
   @moduledoc """
     This module is responsible for generating element macro's. Marker generates by default all html5 elements,
@@ -50,7 +54,7 @@ defmodule Marker.Element do
     * `:lisp` => `my-element`
     * `:lisp_upcase` => `MY-ELEMENT`
   """
-  defstruct tag: :div, attrs: [], content: nil
+  defstruct tag: :div, attrs: [], content: nil, scope: []
 
   @type attr_name     :: atom
   @type attr_value    :: Marker.Encoder.t
@@ -107,10 +111,10 @@ defmodule Marker.Element do
   @doc false
   defmacro def_container(tag, fun) do
     quote bind_quoted: [tag: tag, fun: fun] do
-      defmacro unquote(fun)(content) do
+      defmacro unquote(fun)(scope \\ [], content) do
         compiler = Module.get_attribute(__CALLER__.module, :marker_compiler) || Marker.Compiler
         { _, content } = Marker.Element.normalize_args(content, nil, __CALLER__)
-        %Marker.Element{tag: unquote(tag), content: content}
+        %Marker.Element{tag: unquote(tag), content: content, scope: scope}
         |> compiler.compile()
       end
     end
@@ -176,10 +180,11 @@ defmodule Marker.Element do
       { [{_,_}|_] = attrs, content } ->                             {attrs, content}
       { content, nil } ->                                           {[], content}
       { content, [{_,_}|_] = attrs } ->                             {attrs, content}
-			_ ->
+      _ ->
         raise ArgumentError, message: "element macro received unexpected arguments: (#{inspect content_or_attrs}, #{inspect maybe_content})"
     end
   end
+
 
   def parse_selector(s) do
     binary = to_string(s)
