@@ -1,7 +1,3 @@
-defmodule Marker.Container do
-  defstruct content: nil, scope: []
-end
-
 defmodule Marker.Element do
   @moduledoc """
     This module is responsible for generating element macro's. Marker generates by default all html5 elements,
@@ -54,7 +50,7 @@ defmodule Marker.Element do
     * `:lisp` => `my-element`
     * `:lisp_upcase` => `MY-ELEMENT`
   """
-  defstruct tag: :div, attrs: [], content: nil, scope: []
+  defstruct tag: :div, attrs: [], content: nil
 
   @type attr_name     :: atom
   @type attr_value    :: Marker.Encoder.t
@@ -111,13 +107,43 @@ defmodule Marker.Element do
   @doc false
   defmacro def_container(tag, fun) do
     quote bind_quoted: [tag: tag, fun: fun] do
-      defmacro unquote(fun)(scope \\ [], content) do
+      defmacro unquote(fun)(attrs \\ [], content) do
         compiler = Module.get_attribute(__CALLER__.module, :marker_compiler) || Marker.Compiler
         { _, content } = Marker.Element.normalize_args(content, nil, __CALLER__)
-        %Marker.Element{tag: unquote(tag), content: content, scope: scope}
+        %Marker.Element{tag: unquote(tag), content: content, attrs: attrs}
         |> compiler.compile()
       end
     end
+  end
+
+  defmacro sigil_o({:<<>>, _, [ident]}, _mods) when is_binary(ident) do
+    name = to_string(ident)
+    quote do: %Marker.Element.Obv{name: unquote(name)}
+  end
+
+  defmacro sigil_v({:<<>>, _, [ident]}, _mods) when is_binary(ident) do
+    name = to_string(ident)
+    quote do: %Marker.Element.Var{name: unquote(name)}
+  end
+
+
+  @doc """
+    sigil ~h is a shortcut to create elements
+
+    not that useful because no other attrs can be added, other than class or id.
+
+    ## Examples
+
+    iex> ~h/input.input-group.form/
+    %Marker.Element{
+      attrs: [class: :"input-group", class: :form],
+      content: nil,
+      tag: :input
+    }
+  """
+  defmacro sigil_h({:<<>>, _, [selector]}, _mods) when is_binary(selector) do
+    {tag, attrs} = Marker.Element.parse_selector(selector)
+    quote do: %Marker.Element{tag: unquote(tag), attrs: unquote(attrs)}
   end
 
   @doc false
@@ -216,8 +242,16 @@ defmodule Marker.Element do
   end
 end
 
+# defmodule Marker.Container do
+#   defstruct content: nil, scope: []
+# end
+
 defmodule Marker.Element.If do
   defstruct tag: :_if, test: true, do: nil, else: nil
+end
+
+defmodule Marker.Element.Obv do
+  defstruct tag: :_obv, name: nil
 end
 
 defmodule Marker.Element.Var do

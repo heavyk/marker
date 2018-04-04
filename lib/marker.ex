@@ -10,8 +10,7 @@ defmodule Marker do
   defmacro component(name, do: block) when is_atom(name) do
     use_elements = Module.get_attribute(__CALLER__.module, :marker_use_elements, @default_elements)
     template = String.to_atom(Atom.to_string(name) <> "__template")
-    # {block, logic} = Marker.handle_logic(block, [])
-    block = Marker.handle_logic(block)
+    {block, meta} = Marker.handle_logic(block, [])
     quote do
       defmacro unquote(name)(content_or_attrs \\ nil, maybe_content \\ nil) do
         { attrs, content } = Marker.Element.normalize_args(content_or_attrs, maybe_content, __CALLER__)
@@ -27,7 +26,7 @@ defmodule Marker do
         unquote(use_elements)
         _ = var!(assigns)
         content = unquote(block)
-        component_ do: content
+        component_ unquote(meta), do: content
       end
     end
   end
@@ -35,14 +34,13 @@ defmodule Marker do
   @doc "Define a new template"
   defmacro template(name, do: block) when is_atom(name) do
     use_elements = Module.get_attribute(__CALLER__.module, :marker_use_elements, @default_elements)
-    {block, logic} = Marker.handle_logic(block, [])
-    # block = Marker.handle_logic(block)
+    {block, meta} = Marker.handle_logic(block, [])
     quote do
       def unquote(name)(var!(assigns) \\ []) do
         unquote(use_elements)
         _ = var!(assigns)
         content = unquote(block)
-        template_ unquote(logic), do: content
+        template_ unquote(meta), do: content
       end
     end
   end
@@ -59,97 +57,79 @@ defmodule Marker do
     end
     quote do
       import Marker, only: [component: 2, template: 2]
+      import Marker.Element, only: [sigil_o: 2, sigil_v: 2, sigil_h: 2]
       unquote(use_elements)
     end
   end
 
   @doc false
-  def handle_logic(block, opts) do
+  def handle_logic(block, info) do
     # TODO: swap the case for @var! is for js ... instead make ! ended variables the compile-time variables.
     #       will be: @myvar! is for values to be inlined at compile-time. @myvar is just a normal js obv
     # TODO: prewalk the tree, and in the case of convert outer expressions of variables into logic elements
     # IO.puts "handle_logic: #{inspect block}"
-    {block, _acc} = Macro.traverse(block, opts, fn
-    # PREWALK (going in)
-      # find variables
-      { :@, meta, [{ name, _, atom }]} = expr, opts when is_atom(name) and is_atom(atom) ->
+    {block, _acc} = Macro.traverse(block, info, fn
+      # PREWALK (going in)
+      { :@, meta, [{ name, _, atom }]} = expr, info when is_atom(name) and is_atom(atom) ->
+        # static variable to modify how the template is rendered
         name = name |> to_string()
         # IO.puts "@#{name} ->"
+        line = Keyword.get(meta, :line, 0)
         cond do
           name |> String.last() == "!" ->
-            name = String.trim_trailing(name, "!")
-            opts = Keyword.put(opts, :obv, name)
-            # IO.puts "found obv: #{name}"
-            {expr, opts}
+            name = String.trim_trailing(name, "!") |> String.to_atom()
+            expr = quote line: line do
+              Marker.fetch_assign!(var!(assigns), unquote(name))
+            end
+            {expr, info}
           true ->
-            line = Keyword.get(meta, :line, 0)
-            chars = name |> to_charlist()
-            last = List.last(chars)
-            name = chars
-            |> List.delete(795)
-            |> to_string()
-            |> String.to_atom()
-
-            assign =
-              if last == 795 do
-                quote line: line do
-                  Marker.fetch_assign!(var!(assigns), unquote(name))
-                end
-              else
-                quote line: line do
-                  Access.get(var!(assigns), unquote(name))
-                end
-              end
-            # IO.puts "(runtime) assigns.#{name} (#{if last == 795, do: "required", else: "optional"})"
-            {assign, opts}
+            name = String.to_atom(name)
+            assign = quote line: line do
+              Access.get(var!(assigns), unquote(name))
+            end
+            {assign, info}
         end
 
-      expr, opts ->
+      expr, info ->
         # IO.puts "prewalk expr: #{inspect expr}"
-        {expr, opts}
-    # END PREWALK
+        {expr, info}
+      # END PREWALK
     end, fn
-    # POSTWALK (coming back out)
-      { :@, _meta, [{ name, _, atom }]} = expr, opts when is_atom(name) and is_atom(atom) ->
-        name = name |> to_string()
-        # IO.puts "@#{name} <-"
-        cond do
-          name |> String.last() == "!" ->
-            name = String.trim_trailing(name, "!")
-            expr = quote do: %Marker.Element.Var{name: unquote(name)}
-            # opts = Keyword.delete(opts, :obv, name)
-            # IO.puts "@#{name} -> (obv)"
-            {expr, opts}
-          true ->
-            {expr, opts}
+      # POSTWALK (coming back out)
+      { sigil, _meta, [{:<<>>, _, [name]}, _]}, info when sigil in [:sigil_o, :sigil_v] ->
+        type = case sigil do
+          :sigil_v -> :Var
+          :sigil_o -> :Obv
         end
+        expr =
+          {:%, [], [{:__aliases__, [alias: false], [:Marker, :Element, type]}, {:%{}, [], [name: name]}]}
+        info = Keyword.put(info, String.to_atom(name), type)
+        {expr, info}
 
-      { :if, _meta, [left, right]} = expr, opts -> # when is_atom(test) and is_atom(atom) ->
-        # IO.puts "do_logic: #{Keyword.get(opts, :do_logic)}"
+      { :if, _meta, [left, right]} = expr, info ->
+        vars = get_vars(expr)
         cond do
-          Keyword.get(opts, :obv) ->
+          length(vars) > 0 ->
             do_ = Keyword.get(right, :do)
             else_ = Keyword.get(right, :else, nil)
             test_ = Macro.escape(left)
-            # IO.puts "test: #{inspect test_}"
-            # IO.puts "do: #{inspect do_}"
-            # IO.puts "else: #{inspect else_}"
             expr = quote do: %Marker.Element.If{test: unquote(test_),
                                                   do: unquote(do_),
                                                 else: unquote(else_)}
-            {expr, opts}
+            {expr, info}
           true ->
-            {expr, opts}
+            {expr, info}
         end
-      expr, opts ->
+      expr, info ->
         # IO.puts "postwalk expr: #{inspect expr}"
-        {expr, opts}
-    # END postwalk
+        {expr, info}
+      # END postwalk
     end)
-    {block, opts}
+    {block, info}
   end
   def handle_logic(block) do
-    {block, _opts} = handle_logic(block, [])
+    # shorthand: no scope info
+    {block, _info} = handle_logic(block, [])
     block
   end
 
@@ -165,5 +145,17 @@ defmodule Marker do
           "Please ensure all assigns are given as options. " <>
           "Available assigns: #{inspect keys}"
     end
+  end
+
+  defp get_vars(block) do
+    {_, vars} = Macro.postwalk(block, [], fn
+      {:%, _, [{:__aliases__, _, [:Marker, :Element, type]}, {:%{}, _, [name: name]}]} = expr, opts when type in [:Obv, :Var] ->
+        opts = Keyword.put(opts, String.to_atom(name), type)
+        {expr, opts}
+
+      expr, opts ->
+        {expr, opts}
+    end)
+    vars
   end
 end
