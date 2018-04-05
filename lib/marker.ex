@@ -10,8 +10,8 @@ defmodule Marker do
   @doc "Define a new component"
   defmacro component(name, do: block) when is_atom(name) do
     template = String.to_atom(Atom.to_string(name) <> "__template")
-    use_elements = default(Module.get_attribute(__CALLER__.module, :marker_use_elements), (quote do: use Marker.HTML))
-    transformers = default(Module.get_attribute(__CALLER__.module, :marker_transformers), [@default_transformers])
+    use_elements = Module.get_attribute(__CALLER__.module, :marker_use_elements) || (quote do: use Marker.HTML)
+    transformers = Module.get_attribute(__CALLER__.module, :marker_transformers) || [@default_transformers]
     {block, info} = Enum.reduce(transformers, {block, []}, fn t, {blk, info} -> t.(blk, info) end)
     quote do
       defmacro unquote(name)(content_or_attrs \\ nil, maybe_content \\ nil) do
@@ -35,8 +35,8 @@ defmodule Marker do
 
   @doc "Define a new template"
   defmacro template(name, do: block) when is_atom(name) do
-    use_elements = default(Module.get_attribute(__CALLER__.module, :marker_use_elements), (quote do: use Marker.HTML))
-    transformers = default(Module.get_attribute(__CALLER__.module, :marker_transformers), [@default_transformers])
+    use_elements = Module.get_attribute(__CALLER__.module, :marker_use_elements) || (quote do: use Marker.HTML)
+    transformers = Module.get_attribute(__CALLER__.module, :marker_transformers) || [@default_transformers]
     {block, info} = Enum.reduce(transformers, {block, []}, fn t, {blk, info} -> t.(blk, info) end)
     quote do
       def unquote(name)(var!(assigns) \\ []) do
@@ -45,13 +45,6 @@ defmodule Marker do
         content = unquote(block)
         template_ unquote(info), do: content
       end
-    end
-  end
-
-  def default(val, default_) do
-    case val do
-      nil -> default_
-      _ -> val
     end
   end
 
