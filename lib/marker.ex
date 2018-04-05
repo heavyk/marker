@@ -68,7 +68,7 @@ defmodule Marker do
     #       will be: @myvar! is for values to be inlined at compile-time. @myvar is just a normal js obv
     # TODO: prewalk the tree, and in the case of convert outer expressions of variables into logic elements
     # IO.puts "handle_logic: #{inspect block}"
-    {block, _acc} = Macro.traverse(block, info, fn
+    {block, info} = Macro.traverse(block, info, fn
       # PREWALK (going in)
       { :@, meta, [{ name, _, atom }]} = expr, info when is_atom(name) and is_atom(atom) ->
         # static variable to modify how the template is rendered
@@ -103,7 +103,15 @@ defmodule Marker do
         end
         expr =
           {:%, [], [{:__aliases__, [alias: false], [:Marker, :Element, type]}, {:%{}, [], [name: name]}]}
-        info = Keyword.put(info, String.to_atom(name), type)
+        name = String.to_atom(name)
+        IO.puts "info: #{name}: #{type} exists: #{Keyword.get(info, name)}"
+        info = case t = Keyword.get(info, name) do
+          nil -> Keyword.put(info, name, type)
+          ^type -> info
+          # TODO: better error messages!!
+          _ -> raise RuntimeError, "#{name} is a #{t}. it cannot be redefined to be a #{type} in the same template"
+          # _ -> IO.puts :stderr, "#{name} is a #{t}. it cannot be redefined to be a #{type} in the same template"
+        end
         {expr, info}
 
       { :if, _meta, [left, right]} = expr, info ->
