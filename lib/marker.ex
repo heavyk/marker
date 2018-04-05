@@ -3,14 +3,16 @@ defmodule Marker do
 
   @default_elements Marker.HTML
   @default_compiler Marker.Compiler
+  @default_transformers &Marker.handle_logic/2
 
   @type content :: Marker.Encoder.t | [Marker.Encoder.t] | [content]
 
   @doc "Define a new component"
   defmacro component(name, do: block) when is_atom(name) do
-    use_elements = Module.get_attribute(__CALLER__.module, :marker_use_elements, @default_elements)
     template = String.to_atom(Atom.to_string(name) <> "__template")
-    {block, meta} = Marker.handle_logic(block, [])
+    use_elements = default(Module.get_attribute(__CALLER__.module, :marker_use_elements), (quote do: use Marker.HTML))
+    transformers = default(Module.get_attribute(__CALLER__.module, :marker_transformers), [@default_transformers])
+    {block, info} = Enum.reduce(transformers, {block, []}, fn t, {blk, info} -> t.(blk, info) end)
     quote do
       defmacro unquote(name)(content_or_attrs \\ nil, maybe_content \\ nil) do
         { attrs, content } = Marker.Element.normalize_args(content_or_attrs, maybe_content, __CALLER__)
@@ -26,34 +28,43 @@ defmodule Marker do
         unquote(use_elements)
         _ = var!(assigns)
         content = unquote(block)
-        component_ unquote(meta), do: content
+        component_ unquote(info), do: content
       end
     end
   end
 
   @doc "Define a new template"
   defmacro template(name, do: block) when is_atom(name) do
-    use_elements = Module.get_attribute(__CALLER__.module, :marker_use_elements, @default_elements)
-    {block, meta} = Marker.handle_logic(block, [])
+    use_elements = default(Module.get_attribute(__CALLER__.module, :marker_use_elements), (quote do: use Marker.HTML))
+    transformers = default(Module.get_attribute(__CALLER__.module, :marker_transformers), [@default_transformers])
+    {block, info} = Enum.reduce(transformers, {block, []}, fn t, {blk, info} -> t.(blk, info) end)
     quote do
       def unquote(name)(var!(assigns) \\ []) do
         unquote(use_elements)
         _ = var!(assigns)
         content = unquote(block)
-        template_ unquote(meta), do: content
+        template_ unquote(info), do: content
       end
+    end
+  end
+
+  def default(val, default_) do
+    case val do
+      nil -> default_
+      _ -> val
     end
   end
 
   defmacro __using__(opts) do
     compiler = opts[:compiler] || @default_compiler
     compiler = Macro.expand(compiler, __CALLER__)
-    mods = Keyword.get(opts, :elements, @default_elements)
-    use_elements =
-      for mod <- List.wrap(mods), do: (quote do: use unquote(mod))
+    mods = Keyword.get(opts, :elements, @default_elements) |> List.wrap()
+    use_elements = for mod <- mods, do: (quote do: use unquote(mod))
+    transformers = Keyword.get(opts, :transformers, @default_transformers) |> List.wrap()
     if mod = __CALLER__.module do
       Module.put_attribute(mod, :marker_compiler, compiler)
       Module.put_attribute(mod, :marker_use_elements, use_elements)
+      Module.put_attribute(mod, :marker_transformers, transformers)
     end
     quote do
       import Marker, only: [component: 2, template: 2]
