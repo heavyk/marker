@@ -57,7 +57,7 @@ defmodule Marker do
     end
     quote do
       import Marker, only: [component: 2, template: 2]
-      import Marker.Element, only: [sigil_o: 2, sigil_v: 2, sigil_h: 2]
+      import Marker.Element, only: [sigil_o: 2, sigil_v: 2, sigil_g: 2, sigil_h: 2]
       unquote(use_elements)
     end
   end
