@@ -104,13 +104,11 @@ defmodule Marker do
         expr =
           {:%, [], [{:__aliases__, [alias: false], [:Marker, :Element, type]}, {:%{}, [], [name: name]}]}
         name = String.to_atom(name)
-        IO.puts "info: #{name}: #{type} exists: #{Keyword.get(info, name)}"
         info = case t = Keyword.get(info, name) do
           nil -> Keyword.put(info, name, type)
           ^type -> info
           # TODO: better error messages!!
           _ -> raise RuntimeError, "#{name} is a #{t}. it cannot be redefined to be a #{type} in the same template"
-          # _ -> IO.puts :stderr, "#{name} is a #{t}. it cannot be redefined to be a #{type} in the same template"
         end
         {expr, info}
 
@@ -155,7 +153,7 @@ defmodule Marker do
     end
   end
 
-  defp get_vars(block) do
+  def get_vars(block) do
     {_, vars} = Macro.postwalk(block, [], fn
       {:%, _, [{:__aliases__, _, [:Marker, :Element, type]}, {:%{}, _, [name: name]}]} = expr, opts when type in [:Obv, :Var] ->
         opts = Keyword.put(opts, String.to_atom(name), type)
