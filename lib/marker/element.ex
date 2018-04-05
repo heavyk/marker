@@ -61,10 +61,9 @@ defmodule Marker.Element do
 
   @doc false
   defmacro __using__(opts) do
-    tags = opts[:tags] || []
-    casing = opts[:casing] || :snake
-    containers = [:template, :component] ++ List.wrap(opts[:containers])
-    tags = Macro.expand(tags, __CALLER__)
+    tags = Macro.expand(opts[:tags] || [], __CALLER__)
+    casing = Macro.expand(opts[:casing] || :snake, __CALLER__)
+    containers = Macro.expand([:template, :component] ++ List.wrap(opts[:containers]), __CALLER__)
     functions = Enum.reduce(__CALLER__.functions, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
     macros = Enum.reduce(__CALLER__.macros, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
     remove = Keyword.keys(find_ambiguous_imports(tags))
