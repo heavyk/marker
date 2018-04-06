@@ -3,7 +3,8 @@ defmodule Marker do
 
   @default_elements Marker.HTML
   @default_compiler Marker.Compiler
-  @default_transformers &Marker.handle_logic/2
+  @default_imports [component: 2, template: 2]
+  @default_transformers &Marker.handle_assigns/2
 
   @type content :: Marker.Encoder.t | [Marker.Encoder.t] | [content]
 
@@ -11,8 +12,7 @@ defmodule Marker do
   defmacro component(name, do: block) when is_atom(name) do
     template = String.to_atom(Atom.to_string(name) <> "__template")
     use_elements = Module.get_attribute(__CALLER__.module, :marker_use_elements) || (quote do: use Marker.HTML)
-    transformers = Module.get_attribute(__CALLER__.module, :marker_transformers) || [@default_transformers]
-    {block, info} = Enum.reduce(transformers, {block, []}, fn t, {blk, info} -> t.(blk, info) end)
+    block = Marker.handle_assigns(block, true)
     quote do
       defmacro unquote(name)(content_or_attrs \\ nil, maybe_content \\ nil) do
         { attrs, content } = Marker.Element.normalize_args(content_or_attrs, maybe_content, __CALLER__)
@@ -28,7 +28,7 @@ defmodule Marker do
         unquote(use_elements)
         _ = var!(assigns)
         content = unquote(block)
-        component_ unquote(info), do: content
+        component_ do: content
       end
     end
   end
@@ -36,111 +36,73 @@ defmodule Marker do
   @doc "Define a new template"
   defmacro template(name, do: block) when is_atom(name) do
     use_elements = Module.get_attribute(__CALLER__.module, :marker_use_elements) || (quote do: use Marker.HTML)
-    transformers = Module.get_attribute(__CALLER__.module, :marker_transformers) || [@default_transformers]
-    {block, info} = Enum.reduce(transformers, {block, []}, fn t, {blk, info} -> t.(blk, info) end)
+    block = Marker.handle_assigns(block, false)
     quote do
       def unquote(name)(var!(assigns) \\ []) do
         unquote(use_elements)
         _ = var!(assigns)
         content = unquote(block)
-        template_ unquote(info), do: content
+        template_ do: content
       end
     end
   end
 
   defmacro __using__(opts) do
+    imports = opts[:imports] || @default_imports
+    imports = Macro.expand(imports, __CALLER__)
     compiler = opts[:compiler] || @default_compiler
     compiler = Macro.expand(compiler, __CALLER__)
     mods = Keyword.get(opts, :elements, @default_elements) |> List.wrap()
     use_elements = for mod <- mods, do: (quote do: use unquote(mod))
     transformers = Keyword.get(opts, :transformers, @default_transformers) |> List.wrap()
-    if mod = __CALLER__.module do
-      Module.put_attribute(mod, :marker_compiler, compiler)
-      Module.put_attribute(mod, :marker_use_elements, use_elements)
-      Module.put_attribute(mod, :marker_transformers, transformers)
-    end
+    mod = __CALLER__.module
+    Module.put_attribute(mod, :marker_compiler, compiler)
+    Module.put_attribute(mod, :marker_use_elements, use_elements)
+    Module.put_attribute(mod, :marker_transformers, transformers)
+    # imports = Enum.reduce(mods, imports, fn mod, imports ->
+    #   mod = Macro.expand(mod, __CALLER__)
+    #   IO.puts "mod: #{inspect mod}"
+    #   containers = Module.get_attribute(mod, :containers)
+    #   imports = Keyword.delete(imports, containers)
+    # end)
+    functions = Enum.reduce(__CALLER__.functions, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
+    macros = Enum.reduce(__CALLER__.macros, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
+    imports = imports
+    |> Keyword.drop(functions)
+    |> Keyword.drop(macros)
+    # IO.inspect opts, label: "opts"
+    # IO.inspect imports, label: "imports #{inspect __CALLER__.module}"
+    # IO.inspect :template in functions ++ macros, label: "container in"
     quote do
-      import Marker, only: [component: 2, template: 2]
-      import Marker.Element, only: [sigil_o: 2, sigil_v: 2, sigil_g: 2, sigil_h: 2]
+      import Marker, only: unquote(imports)
+      # import Marker.Element, only: [sigil_o: 2, sigil_v: 2, sigil_g: 2, sigil_h: 2]
       unquote(use_elements)
     end
   end
 
   @doc false
-  def handle_logic(block, info) do
-    # TODO: swap the case for @var! is for js ... instead make ! ended variables the compile-time variables.
-    #       will be: @myvar! is for values to be inlined at compile-time. @myvar is just a normal js obv
-    # TODO: prewalk the tree, and in the case of convert outer expressions of variables into logic elements
-    # IO.puts "handle_logic: #{inspect block}"
-    {block, info} = Macro.traverse(block, info, fn
-      # PREWALK (going in)
-      { :@, meta, [{ name, _, atom }]} = expr, info when is_atom(name) and is_atom(atom) ->
-        # static variable to modify how the template is rendered
-        name = name |> to_string()
-        # IO.puts "@#{name} ->"
+  def handle_assigns(block, allow_optional) do
+    Macro.prewalk(block, fn
+      { :@, meta, [{ name, _, atom }]} when is_atom(name) and is_atom(atom) ->
         line = Keyword.get(meta, :line, 0)
+        str = to_string(name)
         cond do
-          name |> String.last() == "!" ->
-            name = String.trim_trailing(name, "!") |> String.to_atom()
-            expr = quote line: line do
+          String.last(str) == "!" or allow_optional == false ->
+            name = str
+            |> String.trim_trailing("!")
+            |> String.to_atom()
+            quote line: line do
               Marker.fetch_assign!(var!(assigns), unquote(name))
             end
-            {expr, info}
+
           true ->
-            name = String.to_atom(name)
-            assign = quote line: line do
+            quote line: line do
               Access.get(var!(assigns), unquote(name))
             end
-            {assign, info}
         end
-
-      expr, info ->
-        # IO.puts "prewalk expr: #{inspect expr}"
-        {expr, info}
-      # END PREWALK
-    end, fn
-      # POSTWALK (coming back out)
-      { sigil, _meta, [{:<<>>, _, [name]}, _]}, info when sigil in [:sigil_o, :sigil_v] ->
-        type = case sigil do
-          :sigil_v -> :Var
-          :sigil_o -> :Obv
-        end
-        expr =
-          {:%, [], [{:__aliases__, [alias: false], [:Marker, :Element, type]}, {:%{}, [], [name: name]}]}
-        name = String.to_atom(name)
-        info = case t = Keyword.get(info, name) do
-          nil -> Keyword.put(info, name, type)
-          ^type -> info
-          # TODO: better error messages!!
-          _ -> raise RuntimeError, "#{name} is a #{t}. it cannot be redefined to be a #{type} in the same template"
-        end
-        {expr, info}
-
-      { :if, _meta, [left, right]} = expr, info ->
-        vars = get_vars(expr)
-        cond do
-          length(vars) > 0 ->
-            do_ = Keyword.get(right, :do)
-            else_ = Keyword.get(right, :else, nil)
-            test_ = Macro.escape(left)
-            expr = quote do: %Marker.Element.If{test: unquote(test_),
-                                                  do: unquote(do_),
-                                                else: unquote(else_)}
-            {expr, info}
-          true ->
-            {expr, info}
-        end
-      expr, info ->
-        # IO.puts "postwalk expr: #{inspect expr}"
-        {expr, info}
-      # END postwalk
+      expr ->
+        expr
     end)
-    {block, info}
-  end
-  def handle_logic(block) do
-    # shorthand: no scope info
-    {block, _info} = handle_logic(block, [])
-    block
   end
 
   @doc false
@@ -155,17 +117,5 @@ defmodule Marker do
           "Please ensure all assigns are given as options. " <>
           "Available assigns: #{inspect keys}"
     end
-  end
-
-  def get_vars(block) do
-    {_, vars} = Macro.postwalk(block, [], fn
-      {:%, _, [{:__aliases__, _, [:Marker, :Element, type]}, {:%{}, _, [name: name]}]} = expr, opts when type in [:Obv, :Var] ->
-        opts = Keyword.put(opts, String.to_atom(name), type)
-        {expr, opts}
-
-      expr, opts ->
-        {expr, opts}
-    end)
-    vars
   end
 end

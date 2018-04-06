@@ -65,13 +65,13 @@ defmodule Marker.Element do
     tags = Macro.expand(tags, __CALLER__)
     casing = opts[:casing] || :snake
     casing = Macro.expand(casing, __CALLER__)
-    containers = [:template, :component] ++ List.wrap(opts[:containers])
+    containers = opts[:containers] || [:template, :component]
     containers = Macro.expand(containers, __CALLER__)
     functions = Enum.reduce(__CALLER__.functions, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
     macros = Enum.reduce(__CALLER__.macros, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
     remove = Keyword.keys(find_ambiguous_imports(tags))
     keys = (functions ++ macros) -- remove
-    quote do
+    quote bind_quoted: [tags: tags, keys: keys, casing: casing, containers: containers] do
       defmacro __using__(_) do
         ambiguous_imports = Marker.Element.find_ambiguous_imports(unquote(tags))
         quote do
@@ -79,17 +79,18 @@ defmodule Marker.Element do
           import unquote(__MODULE__)
         end
       end
-      Enum.each(unquote(tags), fn tag ->
-        if not tag in unquote(keys) do
-          Marker.Element.def_element(tag, unquote(casing))
+      for tag <- tags do
+        if not tag in keys do
+          Marker.Element.def_element(tag, casing)
         end
-      end)
+      end
       Marker.Element.def_container(:_fragment, :fragment)
-      Enum.each(unquote(containers), fn name ->
-        fun = String.to_atom(Atom.to_string(name) <> "_")
-        tag = String.to_atom("_" <> Atom.to_string(name))
+      for id <- containers do
+        name = Atom.to_string(id)
+        fun = String.to_atom(name <> "_")
+        tag = String.to_atom("_" <> name)
         Marker.Element.def_container(tag, fun)
-      end)
+      end
     end
   end
 
