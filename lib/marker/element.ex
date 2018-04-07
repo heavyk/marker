@@ -119,29 +119,6 @@ defmodule Marker.Element do
     end
   end
 
-  # actually, these should move over to time_machine (cause they only exist there)
-  # go back to to handle_assigns model, and in time machine, add new components as necessary which call
-  defmacro sigil_o({:<<>>, _, [ident]}, _mods) when is_binary(ident) do
-    name = to_string(ident)
-    quote do: %Marker.Element.Obv{name: unquote(name)}
-  end
-
-  defmacro sigil_v({:<<>>, _, [ident]}, _mods) when is_binary(ident) do
-    name = to_string(ident)
-    quote do: %Marker.Element.Var{name: unquote(name)}
-  end
-
-  defmacro sigil_g({:<<>>, _, [ident]}, _mods) when is_binary(ident) do
-    name = to_string(ident)
-    quote do: %Marker.Element.Ref{name: unquote(name)}
-  end
-
-  defmacro sigil_j({:<<>>, _, [txt]}, _mods) when is_binary(txt) do
-    txt = to_string(txt)
-    quote do: %Marker.Element.Js{content: unquote(txt)}
-  end
-
-
   @doc """
     sigil ~h is a shortcut to create elements
 

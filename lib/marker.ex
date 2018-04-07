@@ -4,7 +4,6 @@ defmodule Marker do
   @default_elements Marker.HTML
   @default_compiler Marker.Compiler
   @default_imports [component: 2, template: 2]
-  @default_transformers &Marker.handle_assigns/2
 
   @type content :: Marker.Encoder.t | [Marker.Encoder.t] | [content]
 
@@ -48,34 +47,24 @@ defmodule Marker do
   end
 
   defmacro __using__(opts) do
+    caller = __CALLER__
     imports = opts[:imports] || @default_imports
-    imports = Macro.expand(imports, __CALLER__)
+    imports = Macro.expand(imports, caller)
     compiler = opts[:compiler] || @default_compiler
-    compiler = Macro.expand(compiler, __CALLER__)
-    mods = Keyword.get(opts, :elements, @default_elements) |> List.wrap()
+    compiler = Macro.expand(compiler, caller)
+    mods = Keyword.get(opts, :elements, @default_elements)
+    mods = Macro.expand(mods, caller) |> List.wrap()
     use_elements = for mod <- mods, do: (quote do: use unquote(mod))
-    transformers = Keyword.get(opts, :transformers, @default_transformers) |> List.wrap()
-    mod = __CALLER__.module
-    Module.put_attribute(mod, :marker_compiler, compiler)
-    Module.put_attribute(mod, :marker_use_elements, use_elements)
-    Module.put_attribute(mod, :marker_transformers, transformers)
-    # imports = Enum.reduce(mods, imports, fn mod, imports ->
-    #   mod = Macro.expand(mod, __CALLER__)
-    #   IO.puts "mod: #{inspect mod}"
-    #   containers = Module.get_attribute(mod, :containers)
-    #   imports = Keyword.delete(imports, containers)
-    # end)
-    functions = Enum.reduce(__CALLER__.functions, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
-    macros = Enum.reduce(__CALLER__.macros, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
+    Module.put_attribute(caller.module, :marker_compiler, compiler)
+    Module.put_attribute(caller.module, :marker_use_elements, use_elements)
+    functions = Enum.reduce(caller.functions, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
+    macros = Enum.reduce(caller.macros, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
     imports = imports
     |> Keyword.drop(functions)
     |> Keyword.drop(macros)
-    # IO.inspect opts, label: "opts"
-    # IO.inspect imports, label: "imports #{inspect __CALLER__.module}"
-    # IO.inspect :template in functions ++ macros, label: "container in"
     quote do
       import Marker, only: unquote(imports)
-      # import Marker.Element, only: [sigil_o: 2, sigil_v: 2, sigil_g: 2, sigil_h: 2]
+      import Marker.Element, only: [sigil_h: 2]
       unquote(use_elements)
     end
   end
