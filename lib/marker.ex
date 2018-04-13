@@ -54,7 +54,7 @@ defmodule Marker do
     compiler = Macro.expand(compiler, caller)
     mods = Keyword.get(opts, :elements, @default_elements)
     mods = Macro.expand(mods, caller) |> List.wrap()
-    use_elements = for mod <- mods, do: (quote do: use unquote(mod))
+    use_elements = for mod <- mods, do: (quote do: use unquote(mod), module: unquote(caller.module))
     Module.put_attribute(caller.module, :marker_compiler, compiler)
     Module.put_attribute(caller.module, :marker_use_elements, use_elements)
     functions = Enum.reduce(caller.functions, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
@@ -100,7 +100,6 @@ defmodule Marker do
       {:ok, val} ->
         val
       :error ->
-        # TODO: we need to use this, and when the variable does not exist, perhaps catch the error and transform into a %Marker.Element.If{}
         keys = Enum.map(assigns, &elem(&1, 0))
         raise "assign @#{key} not available in Marker template. " <>
           "Please ensure all assigns are given as options. " <>

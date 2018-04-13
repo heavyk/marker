@@ -61,14 +61,15 @@ defmodule Marker.Element do
 
   @doc false
   defmacro __using__(opts) do
+    caller = __CALLER__
     tags = opts[:tags] || []
-    tags = Macro.expand(tags, __CALLER__)
+    tags = Macro.expand(tags, caller)
     casing = opts[:casing] || :snake
-    casing = Macro.expand(casing, __CALLER__)
+    casing = Macro.expand(casing, caller)
     containers = opts[:containers] || [:template, :component]
-    containers = Macro.expand(containers, __CALLER__)
-    functions = Enum.reduce(__CALLER__.functions, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
-    macros = Enum.reduce(__CALLER__.macros, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
+    containers = Macro.expand(containers, caller)
+    functions = Enum.reduce(caller.functions, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
+    macros = Enum.reduce(caller.macros, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
     remove = Keyword.keys(find_ambiguous_imports(tags))
     keys = (functions ++ macros) -- remove
     quote bind_quoted: [tags: tags, keys: keys, casing: casing, containers: containers] do
@@ -237,23 +238,3 @@ end
 # defmodule Marker.Container do
 #   defstruct content: nil, scope: []
 # end
-
-defmodule Marker.Element.If do
-  defstruct tag: :_if, test: true, do: nil, else: nil
-end
-
-defmodule Marker.Element.Obv do
-  defstruct tag: :_obv, name: nil
-end
-
-defmodule Marker.Element.Var do
-  defstruct tag: :_var, name: nil
-end
-
-defmodule Marker.Element.Ref do
-  defstruct tag: :_ref, name: nil
-end
-
-defmodule Marker.Element.Js do
-  defstruct tag: :_js, content: nil
-end
