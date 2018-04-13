@@ -98,11 +98,17 @@ defmodule Marker.Element do
   @doc false
   defmacro def_element(tag, casing) do
     quote bind_quoted: [tag: tag, casing: casing] do
-      defmacro unquote(tag)(content_or_attrs \\ nil, maybe_content \\ nil) do
+      defmacro unquote(tag)(c1 \\ nil, c2 \\ nil, c3 \\ nil, c4 \\ nil, c5 \\ nil) do
+        caller = __CALLER__
         tag = unquote(tag) |> Marker.Element.apply_casing(unquote(casing))
-        compiler = Module.get_attribute(__CALLER__.module, :marker_compiler) || Marker.Compiler
-        { attrs, content } = Marker.Element.normalize_args(content_or_attrs, maybe_content, __CALLER__)
-        %Marker.Element{tag: tag, attrs: attrs, content: content}
+        compiler = Module.get_attribute(caller.module, :marker_compiler) || Marker.Compiler
+
+        %Marker.Element{tag: tag, attrs: [], content: []}
+        |> Marker.Element.add_arg(c1, caller)
+        |> Marker.Element.add_arg(c2, caller)
+        |> Marker.Element.add_arg(c3, caller)
+        |> Marker.Element.add_arg(c4, caller)
+        |> Marker.Element.add_arg(c5, caller)
         |> compiler.compile()
       end
     end
@@ -182,25 +188,20 @@ defmodule Marker.Element do
   defguard is_selector(v) when length(v) > 1 and is_integer(hd(v))
 
   @doc false
-  def normalize_args(content_or_attrs, maybe_content, env) do
-    case {expand(content_or_attrs, env), expand(maybe_content, env)} do
-      { [{:do, {:"__block__", _, content}}], nil } ->               {[], content}
-      { [{:do, content}], nil } ->                                  {[], content}
-
-      # selectors :: eg. (div '.c1.c2#id')
-      { attrs, nil } when is_selector(attrs) ->                                 {selector_attrs(attrs), nil}
-      { attrs, [{:do, {:"__block__", _, content}}] } when is_selector(attrs) -> {selector_attrs(attrs), content}
-      { attrs, [{:do, content}] } when is_selector(attrs) ->                    {selector_attrs(attrs), content}
-      { attrs, content } when is_selector(attrs) ->                             {selector_attrs(attrs), content}
-
-      { [{_,_}|_] = attrs, nil } ->                                 {attrs, nil}
-      { [{_,_}|_] = attrs, [{:do, {:"__block__", _, content}}] } -> {attrs, content}
-      { [{_,_}|_] = attrs, [{:do, content}] } ->                    {attrs, content}
-      { [{_,_}|_] = attrs, content } ->                             {attrs, content}
-      { content, nil } ->                                           {[], content}
-      { content, [{_,_}|_] = attrs } ->                             {attrs, content}
-      _ ->
-        raise ArgumentError, message: "element macro received unexpected arguments: (#{inspect content_or_attrs}, #{inspect maybe_content})"
+  def add_arg(el, content_or_attrs, env) do
+    cond do
+      content_or_attrs == nil -> el
+      true ->
+        %Marker.Element{tag: tag, attrs: attrs_, content: content_} = el
+        content_ = List.wrap(content_)
+        {content, attrs} = case expand(content_or_attrs, env) do
+          attrs when is_selector(attrs)       -> {content_, Keyword.merge(attrs_, selector_attrs(attrs))}
+          [{:do, {:"__block__", _, content}}] -> {content_ ++ List.wrap(content), attrs_}
+          [{:do, content}]                    -> {content_ ++ List.wrap(content), attrs_}
+          [{_,_}|_] = attrs                   -> {content_, Keyword.merge(attrs_, attrs)}
+          content                             -> {content_ ++ List.wrap(content), attrs_}
+        end
+        %Marker.Element{tag: tag, content: content, attrs: attrs}
     end
   end
 

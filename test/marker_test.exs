@@ -50,6 +50,8 @@ defmodule MarkerTest do
     assert div([a: 1], do: 42) == {:safe, "<div a='1'>42</div>"}
     assert (div do 42 end) == {:safe, "<div>42</div>"}
     assert (div a: 1 do 42 end) == {:safe, "<div a='1'>42</div>"}
+    assert (div [a: 1], "42", 42) == {:safe, "<div a='1'>4242</div>"}
+    assert (div "42", 42, [a: 1]) == {:safe, "<div a='1'>4242</div>"}
   end
 
   test "boolean attrs" do
