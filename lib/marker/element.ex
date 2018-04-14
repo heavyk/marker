@@ -181,8 +181,8 @@ defmodule Marker.Element do
   end
 
   @doc false
-  def find_ambiguous_imports(tags) do
-    default_imports = Kernel.__info__(:functions) ++ Kernel.__info__(:macros)
+  def find_ambiguous_imports(tags, mod \\ Kernel) do
+    default_imports = mod.__info__(:functions) ++ mod.__info__(:macros)
     for { name, arity } <- default_imports, arity in 0..2 and name in tags do
       { name, arity }
     end
@@ -210,7 +210,7 @@ defmodule Marker.Element do
     end
   end
 
-
+  @doc "parses a selector eg. '.lala#id' into a keyword list"
   def parse_selector(s) do
     binary = to_string(s)
     matches = Regex.split(~r/[\.#]?[a-zA-Z0-9_:-]+/, binary, include_captures: true)
