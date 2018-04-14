@@ -117,10 +117,15 @@ defmodule Marker.Element do
   @doc false
   defmacro def_container(tag, fun) do
     quote bind_quoted: [tag: tag, fun: fun] do
-      defmacro unquote(fun)(attrs \\ [], content) do
+      defmacro unquote(fun)(c1 \\ nil, c2 \\ nil, c3 \\ nil, c4 \\ nil, c5 \\ nil) do
+        caller = __CALLER__
         compiler = Module.get_attribute(__CALLER__.module, :marker_compiler) || Marker.Compiler
-        { _, content } = Marker.Element.normalize_args(content, nil, __CALLER__)
-        %Marker.Element{tag: unquote(tag), content: content, attrs: attrs}
+        %Marker.Element{tag: unquote(tag), attrs: [], content: []}
+        |> Marker.Element.add_arg(c1, caller)
+        |> Marker.Element.add_arg(c2, caller)
+        |> Marker.Element.add_arg(c3, caller)
+        |> Marker.Element.add_arg(c4, caller)
+        |> Marker.Element.add_arg(c5, caller)
         |> compiler.compile()
       end
     end

@@ -13,8 +13,15 @@ defmodule Marker do
     use_elements = Module.get_attribute(__CALLER__.module, :marker_use_elements) || (quote do: use Marker.HTML)
     block = Marker.handle_assigns(block, true)
     quote do
-      defmacro unquote(name)(content_or_attrs \\ nil, maybe_content \\ nil) do
-        { attrs, content } = Marker.Element.normalize_args(content_or_attrs, maybe_content, __CALLER__)
+      defmacro unquote(name)(c1 \\ nil, c2 \\ nil, c3 \\ nil, c4 \\ nil, c5 \\ nil) do
+        caller = __CALLER__
+        %Marker.Element{attrs: attrs, content: content} =
+          %Marker.Element{attrs: [], content: []}
+          |> Marker.Element.add_arg(c1, caller)
+          |> Marker.Element.add_arg(c2, caller)
+          |> Marker.Element.add_arg(c3, caller)
+          |> Marker.Element.add_arg(c4, caller)
+          |> Marker.Element.add_arg(c5, caller)
         content = quote do: List.wrap(unquote(content))
         assigns = {:%{}, [], [{:__content__, content} | attrs]}
         template = unquote(template)
