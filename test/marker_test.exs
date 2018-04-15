@@ -35,6 +35,10 @@ defmodule MarkerTest do
     end
   end
 
+  Marker.template :has_assigns do
+    my_form(assigns)
+  end
+
   test "components and templates" do
     content = my_form(class: "test")
     assert content == {:safe, "<form class='test'><div class='form-group'><label for='form-address'>Address</label><input id='form-address' class='form-control ' placeholder='Fill in address'/></div><div class='form-group'><label for='form-country'>Country</label><select id='form-country' class='form-control country-select'><option value='NL'>Netherlands</option><option value='BE'>Belgium</option><option value='LU'>Luxembourg</option></select></div></form>"}
@@ -124,5 +128,9 @@ defmodule MarkerTest do
     :rand.seed(:exsplus, {10001, 102, 1})
     assert test_rand([]) == {:safe, "<div>1st: 4 2</div><div>2nd: 1 2</div>"}
     assert test_rand([]) == {:safe, "<div>1st: 1 3</div><div>2nd: 3 3</div>"}
+  end
+
+  test "template has assigns" do
+    assert has_assigns([class: "lala"]) == my_form([class: "lala"])
   end
 end
