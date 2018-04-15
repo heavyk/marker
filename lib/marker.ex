@@ -64,12 +64,11 @@ defmodule Marker do
     use_elements = for mod <- mods, do: (quote do: use unquote(mod), module: unquote(caller.module))
     Module.put_attribute(caller.module, :marker_compiler, compiler)
     Module.put_attribute(caller.module, :marker_use_elements, use_elements)
-    imports = Enum.reduce(mods, imports, fn mod, imports -> Keyword.drop(imports, Keyword.keys(mod.__info__(:functions))) end)
-    imports = Enum.reduce(mods, imports, fn mod, imports -> Keyword.drop(imports, Keyword.keys(mod.__info__(:macros))) end)
+    imports = Enum.reduce(caller.functions, imports, fn {_, fns}, imports -> Keyword.drop(imports, Keyword.keys(fns)) end)
+    imports = Enum.reduce(caller.macros, imports, fn {_, fns}, imports -> Keyword.drop(imports, Keyword.keys(fns)) end)
     quote do
       import Marker, only: unquote(imports)
       import Marker.Element, only: [sigil_h: 2]
-      unquote(use_elements)
     end
   end
 
