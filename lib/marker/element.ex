@@ -72,26 +72,27 @@ defmodule Marker.Element do
     macros = Enum.reduce(caller.macros, [], fn {_, fns}, acc -> Keyword.keys(fns) ++ acc end)
     remove = Keyword.keys(find_ambiguous_imports(tags))
     keys = (functions ++ macros) -- remove
-    quote bind_quoted: [tags: tags, keys: keys, casing: casing, containers: containers] do
-      defmacro __using__(_) do
-        ambiguous_imports = Marker.Element.find_ambiguous_imports(unquote(tags))
+    case opts[:using] do
+      false ->
         quote do
-          import Kernel, except: unquote(ambiguous_imports)
-          import unquote(__MODULE__)
+          Marker.Element.def_elements(unquote(tags), unquote(keys), unquote(casing))
+          Marker.Element.def_container(:_fragment, :fragment)
+          Marker.Element.def_containers(unquote(containers))
         end
-      end
-      for tag <- tags do
-        if not tag in keys do
-          Marker.Element.def_element(tag, casing)
+      _ ->
+        quote do
+          defmacro __using__(opts) do
+            caller = __CALLER__
+            ambiguous_imports = Marker.Element.find_ambiguous_imports(unquote(tags))
+            quote do
+              import Kernel, except: unquote(ambiguous_imports)
+              import unquote(__MODULE__)
+            end
+          end
+          Marker.Element.def_elements(unquote(tags), unquote(keys), unquote(casing))
+          Marker.Element.def_container(:_fragment, :fragment)
+          Marker.Element.def_containers(unquote(containers))
         end
-      end
-      Marker.Element.def_container(:_fragment, :fragment)
-      for id <- containers do
-        name = Atom.to_string(id)
-        fun = String.to_atom(name <> "_")
-        tag = String.to_atom("_" <> name)
-        Marker.Element.def_container(tag, fun)
-      end
     end
   end
 
@@ -115,6 +116,17 @@ defmodule Marker.Element do
   end
 
   @doc false
+  defmacro def_elements(tags, keys, casing) do
+    quote bind_quoted: [tags: tags, keys: keys, casing: casing] do
+      for tag <- tags do
+        if not tag in keys do
+          Marker.Element.def_element(tag, casing)
+        end
+      end
+    end
+  end
+
+  @doc false
   defmacro def_container(tag, fun) do
     quote bind_quoted: [tag: tag, fun: fun] do
       defmacro unquote(fun)(c1 \\ nil, c2 \\ nil, c3 \\ nil, c4 \\ nil, c5 \\ nil) do
@@ -127,6 +139,18 @@ defmodule Marker.Element do
         |> Marker.Element.add_arg(c4, caller)
         |> Marker.Element.add_arg(c5, caller)
         |> compiler.compile()
+      end
+    end
+  end
+
+  @doc false
+  defmacro def_containers(containers) do
+    quote bind_quoted: [containers: containers] do
+      for id <- containers do
+        name = Atom.to_string(id)
+        fun = String.to_atom(name <> "_")
+        tag = String.to_atom("_" <> name)
+        Marker.Element.def_container(tag, fun)
       end
     end
   end
