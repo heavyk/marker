@@ -119,7 +119,7 @@ defmodule Marker.Element do
     quote bind_quoted: [tag: tag, fun: fun] do
       defmacro unquote(fun)(c1 \\ nil, c2 \\ nil, c3 \\ nil, c4 \\ nil, c5 \\ nil) do
         caller = __CALLER__
-        compiler = Module.get_attribute(__CALLER__.module, :marker_compiler) || Marker.Compiler
+        compiler = Module.get_attribute(caller.module, :marker_compiler) || Marker.Compiler
         %Marker.Element{tag: unquote(tag), attrs: [], content: []}
         |> Marker.Element.add_arg(c1, caller)
         |> Marker.Element.add_arg(c2, caller)
@@ -194,18 +194,19 @@ defmodule Marker.Element do
 
   @doc false
   def add_arg(el, content_or_attrs, env) do
-    cond do
-      content_or_attrs == nil -> el
-      true ->
+    case content_or_attrs do
+      nil -> el
+      _ ->
         %Marker.Element{tag: tag, attrs: attrs_, content: content_} = el
         content_ = List.wrap(content_)
-        {content, attrs} = case expand(content_or_attrs, env) do
-          attrs when is_selector(attrs)       -> {content_, Keyword.merge(attrs_, selector_attrs(attrs))}
-          [{:do, {:"__block__", _, content}}] -> {content_ ++ List.wrap(content), attrs_}
-          [{:do, content}]                    -> {content_ ++ List.wrap(content), attrs_}
-          [{_,_}|_] = attrs                   -> {content_, Keyword.merge(attrs_, attrs)}
-          content                             -> {content_ ++ List.wrap(content), attrs_}
-        end
+        {content, attrs} =
+          case expand(content_or_attrs, env) do
+            attrs when is_selector(attrs)     -> {content_, Keyword.merge(attrs_, selector_attrs(attrs))}
+            [{:do, {:__block__, _, content}}] -> {content_ ++ List.wrap(content), attrs_}
+            [{:do, content}]                  -> {content_ ++ List.wrap(content), attrs_}
+            [{_,_}|_] = attrs                 -> {content_, Keyword.merge(attrs_, attrs)}
+            content                           -> {content_ ++ List.wrap(content), attrs_}
+          end
         %Marker.Element{tag: tag, content: content, attrs: attrs}
     end
   end
