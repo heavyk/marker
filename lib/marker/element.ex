@@ -119,7 +119,7 @@ defmodule Marker.Element do
   defmacro def_elements(tags, keys, casing) do
     quote bind_quoted: [tags: tags, keys: keys, casing: casing] do
       for tag <- tags do
-        if not tag in keys do
+        if tag not in keys do
           Marker.Element.def_element(tag, casing)
         end
       end
